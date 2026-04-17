@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  spotifyId   String   @unique
+  displayName String
+  email       String?
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  boards   Board[]   @relation("UserBoards")
+  likes    Like[]
+  comments Comment[]
+}
+
+model Board {
+  id             String   @id @default(cuid())
+  userId         String
+  title          String
+  description    String?
+  /// Vibe tags / descriptors chosen by the creator
+  tags           String[] @default([])
+  parentBoardId  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User          @relation("UserBoards", fields: [userId], references: [id], onDelete: Cascade)
+  parentBoard  Board?        @relation("BoardRemixes", fields: [parentBoardId], references: [id], onDelete: SetNull)
+  remixes      Board[]       @relation("BoardRemixes")
+  tracks       BoardTrack[]
+  likes        Like[]
+  comments     Comment[]
+
+  @@index([userId])
+  @@index([parentBoardId])
+  @@index([createdAt])
+}
+
+model BoardTrack {
+  id            String  @id @default(cuid())
+  boardId       String
+  spotifyTrackId String
+  trackName     String
+  artistName    String
+  albumImageUrl String?
+  previewUrl    String?
+  position      Int
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@index([boardId])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  boardId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, boardId])
+  @@index([boardId])
+}
+
+model Comment {
+  id              String   @id @default(cuid())
+  userId          String
+  boardId         String
+  parentCommentId String?
+  body            String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  board   Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  parent  Comment? @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([boardId])
+  @@index([parentCommentId])
+}

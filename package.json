@@ -1,0 +1,24 @@
+{
+  "name": "soundboard",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run build -w @soundboard/shared && npm run build -w @soundboard/db && concurrently -n api,web -c blue,magenta \"npm run dev -w @soundboard/api\" \"npm run dev -w @soundboard/web\"",
+    "build": "npm run build -w @soundboard/db && npm run build -w @soundboard/shared && npm run build -w @soundboard/api && npm run build -w @soundboard/web",
+    "db:generate": "npm run generate -w @soundboard/db",
+    "db:migrate": "npm run migrate -w @soundboard/db",
+    "db:push": "npm run push -w @soundboard/db",
+    "db:seed": "npm run seed -w @soundboard/db",
+    "lint": "npm run lint -w @soundboard/web --if-present && npm run lint -w @soundboard/api --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
