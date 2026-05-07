@@ -24,6 +24,19 @@ cd cs278-project
 npm install
 ```
 
+### Milestone demo mode
+
+The web app includes an in-browser demo data fallback for the CS278 milestone. If the API is not
+running, the React app still loads sample boards, search results, comments, likes, and remixes from
+local browser storage, so graders can click through the prototype without Spotify or Postgres setup.
+
+```bash
+npm run dev -w @soundboard/web
+```
+
+Open [http://localhost:5173](http://localhost:5173). To force real API-only behavior, set
+`VITE_DEMO_MODE=false`.
+
 ### 2. Environment
 
 Copy the example env file and edit values:

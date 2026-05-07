@@ -1,18 +1,28 @@
+import { demoFetch } from "./demoData";
+
 export const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE !== "false";
 
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
   const url = `${API_BASE}${path}`;
-  const res = await fetch(url, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...init,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch (error) {
+    if (DEMO_MODE) return demoFetch<T>(path, init);
+    throw error;
+  }
+  if (DEMO_MODE && res.status === 404) return demoFetch<T>(path, init);
   if (!res.ok) {
     let message = res.statusText;
     try {

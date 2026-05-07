@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  @apply bg-shell text-ink font-body antialiased;
+}
+
+::selection {
+  @apply bg-blush/60 text-ink;
+}
