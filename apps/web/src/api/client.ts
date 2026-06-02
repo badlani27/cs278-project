@@ -13,22 +13,39 @@ export async function checkApiHealth(): Promise<{
   spotifyConfigured: boolean;
   database: boolean;
 }> {
-  try {
-    const res = await fetch(`${API_BASE}/health`, { credentials: "include" });
-    if (!res.ok) return { ok: false, spotifyConfigured: false, database: false };
-    const data = (await res.json()) as {
-      ok?: boolean;
-      spotifyConfigured?: boolean;
-      database?: boolean;
-    };
-    return {
-      ok: Boolean(data.ok),
-      spotifyConfigured: Boolean(data.spotifyConfigured),
-      database: Boolean(data.database),
-    };
-  } catch {
-    return { ok: false, spotifyConfigured: false, database: false };
+  const fail = { ok: false, spotifyConfigured: false, database: false };
+  const maxAttempts = 4;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}/health`, {
+        credentials: "include",
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!res.ok) {
+        if (attempt < maxAttempts - 1) {
+          await new Promise((r) => setTimeout(r, 2500));
+          continue;
+        }
+        return fail;
+      }
+      const data = (await res.json()) as {
+        ok?: boolean;
+        spotifyConfigured?: boolean;
+        database?: boolean;
+      };
+      return {
+        ok: Boolean(data.ok),
+        spotifyConfigured: Boolean(data.spotifyConfigured),
+        database: Boolean(data.database),
+      };
+    } catch {
+      if (attempt < maxAttempts - 1) {
+        await new Promise((r) => setTimeout(r, 2500));
+        continue;
+      }
+    }
   }
+  return fail;
 }
 
 export function isDemoMode(): boolean {

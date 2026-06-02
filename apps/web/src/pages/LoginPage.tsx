@@ -48,6 +48,12 @@ export function LoginPage() {
           and playlists when building a board.
         </p>
 
+        {apiStatus === null && (
+          <p className="mt-4 text-sm text-muted" role="status">
+            Connecting to API… (Render free tier may take up to a minute to wake up)
+          </p>
+        )}
+
         {apiStatus?.ok === false && (
           <div
             className="mt-4 rounded-2xl border border-line bg-mist/80 px-4 py-3 text-left text-sm text-ink"
@@ -176,14 +182,14 @@ npm run db:migrate`}
           </p>
         )}
 
-        {apiStatus?.ok !== false ? (
+        {apiStatus?.ok === true ? (
           <a
             href={loginUrl}
             className="mt-8 inline-flex items-center justify-center rounded-2xl bg-[#1DB954] px-6 py-3 font-display text-sm text-white shadow-soft transition hover:brightness-95"
           >
             Continue with Spotify
           </a>
-        ) : demoMode ? (
+        ) : apiStatus?.ok === false && demoMode ? (
           <button
             type="button"
             onClick={() => void continueDemo()}
@@ -191,9 +197,9 @@ npm run db:migrate`}
           >
             Continue in demo mode
           </button>
-        ) : (
+        ) : apiStatus?.ok === false ? (
           <p className="mt-8 text-sm text-muted">Start the API, then refresh this page.</p>
-        )}
+        ) : null}
 
         <p className="mt-6 text-xs text-muted">
           <Link to="/login" className="underline-offset-2 hover:underline">
