@@ -2,14 +2,27 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import session from "express-session";
-import { loadEnv } from "./env";
+import { loadEnv, isSpotifyConfigured } from "./env";
+import { prisma } from "@soundboard/db";
 import { createAuthRouter } from "./routes/auth";
 import { createBoardsRouter } from "./routes/boards";
 import { createCommentsRootRouter } from "./routes/commentRepliesRoot";
 import { createSpotifyRouter } from "./routes/spotify";
+import { createStatsRouter } from "./routes/stats";
 import { createUsersRouter } from "./routes/users";
+import { isDatabaseError } from "./middleware/asyncHandler";
 
 const env = loadEnv();
+
+function sessionSameSite(): "lax" | "none" {
+  try {
+    const clientHost = new URL(env.CLIENT_URL).hostname;
+    const apiHost = new URL(env.API_URL).hostname;
+    return clientHost === apiHost ? "lax" : "none";
+  } catch {
+    return "lax";
+  }
+}
 
 const app = express();
 
@@ -17,7 +30,18 @@ app.set("trust proxy", 1);
 
 app.use(
   cors({
-    origin: env.CLIENT_URL,
+    origin(origin, callback) {
+      const allowed = new Set([
+        env.CLIENT_URL,
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+      ]);
+      if (!origin || allowed.has(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true,
   }),
 );
@@ -31,29 +55,60 @@ app.use(
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: env.NODE_ENV === "production" ? sessionSameSite() : "lax",
       secure: env.NODE_ENV === "production",
       maxAge: 14 * 24 * 60 * 60 * 1000,
     },
   }),
 );
 
-app.get("/health", (_req, res) => {
-  res.json({ ok: true });
+app.get("/health", async (_req, res) => {
+  const env = loadEnv();
+  let database = false;
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    database = true;
+  } catch {
+    database = false;
+  }
+  res.json({
+    ok: true,
+    spotifyConfigured: isSpotifyConfigured(env),
+    database,
+  });
 });
 
-app.use("/auth", createAuthRouter(env));
+app.use("/auth", createAuthRouter());
 app.use("/boards", createBoardsRouter());
 app.use("/comments", createCommentsRootRouter());
-app.use("/spotify", createSpotifyRouter(env));
+app.use("/spotify", createSpotifyRouter());
 app.use("/users", createUsersRouter());
+app.use("/stats", createStatsRouter());
 
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
+  if (isDatabaseError(err)) {
+    res.status(503).json({
+      error: "Database unavailable. Start PostgreSQL and run npm run db:migrate.",
+    });
+    return;
+  }
   res.status(500).json({ error: "Internal server error" });
 });
 
 const port = env.PORT;
-app.listen(port, () => {
+const host = env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1";
+const server = app.listen(port, host, () => {
   console.log(`Soundboard API listening on ${env.API_URL} (port ${port})`);
+});
+
+server.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(
+      `\nPort ${port} is already in use. Stop other dev servers (Ctrl+C), then run:\n  npm run dev\n`,
+    );
+  } else {
+    console.error(err);
+  }
+  process.exit(1);
 });

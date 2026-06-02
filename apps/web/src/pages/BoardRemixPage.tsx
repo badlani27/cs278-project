@@ -55,6 +55,7 @@ export function BoardRemixPage() {
     artistName: t.artistName,
     albumImageUrl: t.albumImageUrl,
     previewUrl: t.previewUrl,
+    note: t.note,
     position: t.position,
   }));
 
@@ -79,6 +80,7 @@ export function BoardRemixPage() {
         initialTracks={initialTracks}
         submitLabel="Publish remix"
         hint="Attribution is preserved automatically. The original board stays linked from your remix."
+        remixSourceBoardId={board.id}
         onSubmit={async (payload) => {
           const created = await apiFetch<BoardDetail>(`/boards/${board.id}/remix`, {
             method: "POST",

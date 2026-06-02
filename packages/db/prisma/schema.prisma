@@ -8,17 +8,23 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  spotifyId   String   @unique
-  displayName String
-  email       String?
-  imageUrl    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  spotifyId           String   @unique
+  displayName         String
+  email               String?
+  imageUrl            String?
+  /// Used to fetch recently played tracks and playlists on the user's behalf
+  spotifyRefreshToken String?
+  /// Opt-in weekly board seed suggestions (draft only, never auto-posted)
+  weeklySeedOptIn     Boolean  @default(false)
+  lastBoardSeedAt     DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  boards   Board[]   @relation("UserBoards")
-  likes    Like[]
-  comments Comment[]
+  boards      Board[]      @relation("UserBoards")
+  likes       Like[]
+  comments    Comment[]
+  usageEvents UsageEvent[]
 }
 
 model Board {
@@ -38,6 +44,7 @@ model Board {
   tracks       BoardTrack[]
   likes        Like[]
   comments     Comment[]
+  usageEvents  UsageEvent[]
 
   @@index([userId])
   @@index([parentBoardId])
@@ -52,6 +59,8 @@ model BoardTrack {
   artistName    String
   albumImageUrl String?
   previewUrl    String?
+  /// Creator's note about why this track belongs on the board
+  note          String?
   position      Int
 
   board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
@@ -88,4 +97,20 @@ model Comment {
 
   @@index([boardId])
   @@index([parentCommentId])
+}
+
+model UsageEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  boardId   String?
+  /// LOGIN | BOARD_CREATE | BOARD_REMIX | LIKE | COMMENT | REPLY | BOARD_SEED_VIEW
+  eventType String
+  createdAt DateTime @default(now())
+
+  user  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  board Board? @relation(fields: [boardId], references: [id], onDelete: SetNull)
+
+  @@index([eventType])
+  @@index([createdAt])
+  @@index([userId])
 }

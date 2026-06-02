@@ -4,6 +4,7 @@ export type BoardTrackInput = {
   artistName: string;
   albumImageUrl?: string | null;
   previewUrl?: string | null;
+  note?: string | null;
   position: number;
 };
 
@@ -23,10 +24,54 @@ export type SpotifySearchTrack = {
   previewUrl: string | null;
 };
 
+export type SpotifyPlaylistSummary = {
+  id: string;
+  name: string;
+  trackCount: number;
+  imageUrl: string | null;
+};
+
 export type PublicUser = {
   id: string;
   displayName: string;
   imageUrl: string | null;
+};
+
+export type SessionUser = PublicUser & {
+  spotifyLibraryLinked: boolean;
+  weeklySeedOptIn: boolean;
+};
+
+export type BoardTasteOverlap = {
+  sharedTracks: SpotifySearchTrack[];
+  sharedTags: string[];
+};
+
+export type BoardSeedDraft = {
+  tracks: SpotifySearchTrack[];
+  suggestedTitle: string;
+  suggestedTags: string[];
+  descriptionHint: string;
+};
+
+export type BoardSeedResponse = {
+  available: boolean;
+  reason?: string;
+  draft?: BoardSeedDraft;
+};
+
+export type UsageStats = {
+  activeUsers: number;
+  totals: {
+    logins: number;
+    boardCreates: number;
+    remixes: number;
+    likes: number;
+    comments: number;
+    replies: number;
+    boardSeedViews: number;
+  };
+  since: string;
 };
 
 export type BoardSummary = {
@@ -53,6 +98,7 @@ export type BoardDetail = BoardSummary & {
     artistName: string;
     albumImageUrl: string | null;
     previewUrl: string | null;
+    note: string | null;
     position: number;
   }[];
   likedByMe: boolean;
@@ -72,5 +118,5 @@ export type CommentNode = {
 };
 
 export type MeResponse = {
-  user: PublicUser | null;
+  user: SessionUser | null;
 };

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import type { BoardDetail } from "@soundboard/shared";
+import type { BoardDetail, BoardTasteOverlap } from "@soundboard/shared";
 import { apiFetch } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { BoardCover } from "../components/BoardCover";
 import { CommentSection } from "../components/CommentSection";
+import { TasteOverlapPanel } from "../components/TasteOverlapPanel";
 
 export function BoardDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +14,9 @@ export function BoardDetailPage() {
   const [board, setBoard] = useState<BoardDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [overlap, setOverlap] = useState<BoardTasteOverlap | null>(null);
+  const [overlapLoading, setOverlapLoading] = useState(false);
+  const [overlapError, setOverlapError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -34,6 +38,33 @@ export function BoardDetailPage() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!id || !user) {
+      setOverlap(null);
+      return;
+    }
+    let cancelled = false;
+    async function run() {
+      setOverlapLoading(true);
+      setOverlapError(null);
+      try {
+        const data = await apiFetch<BoardTasteOverlap>(`/boards/${id}/overlap`);
+        if (!cancelled) setOverlap(data);
+      } catch (e) {
+        if (!cancelled) {
+          setOverlapError(e instanceof Error ? e.message : null);
+          setOverlap(null);
+        }
+      } finally {
+        if (!cancelled) setOverlapLoading(false);
+      }
+    }
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, user]);
 
   async function toggleLike() {
     if (!user || !board) return;
@@ -119,6 +150,13 @@ export function BoardDetailPage() {
             {board.description && (
               <p className="text-sm leading-relaxed text-ink/90">{board.description}</p>
             )}
+            {user && (
+              <TasteOverlapPanel
+                overlap={overlap}
+                loading={overlapLoading}
+                error={overlapError}
+              />
+            )}
             {board.tags.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {board.tags.map((t) => (
@@ -183,6 +221,9 @@ export function BoardDetailPage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-ink">{t.trackName}</p>
                     <p className="truncate text-xs text-muted">{t.artistName}</p>
+                    {t.note && (
+                      <p className="mt-1 text-xs italic leading-relaxed text-ink/80">“{t.note}”</p>
+                    )}
                     {t.previewUrl && (
                       <audio controls className="mt-2 h-8 w-full max-w-xs" src={t.previewUrl} />
                     )}

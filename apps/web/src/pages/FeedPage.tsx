@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { BoardSummary } from "@soundboard/shared";
+import type { BoardSeedResponse, BoardSummary } from "@soundboard/shared";
 import { apiFetch } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
 import { BoardCard } from "../components/BoardCard";
+import { WeeklySeedBanner } from "../components/WeeklySeedBanner";
 
 export function FeedPage() {
+  const { user } = useAuth();
   const [feed, setFeed] = useState<BoardSummary[] | null>(null);
   const [discover, setDiscover] = useState<BoardSummary[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [seed, setSeed] = useState<BoardSeedResponse | null>(null);
+  const [seedDismissed, setSeedDismissed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +37,26 @@ export function FeedPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!user?.weeklySeedOptIn) {
+      setSeed(null);
+      return;
+    }
+    let cancelled = false;
+    async function run() {
+      try {
+        const data = await apiFetch<BoardSeedResponse>("/spotify/board-seed");
+        if (!cancelled) setSeed(data);
+      } catch {
+        if (!cancelled) setSeed(null);
+      }
+    }
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.weeklySeedOptIn, user?.id]);
 
   if (loading) {
     return (
@@ -72,6 +97,10 @@ export function FeedPage() {
           Start a board
         </Link>
       </header>
+
+      {user?.weeklySeedOptIn && !seedDismissed && seed?.available && seed.draft && (
+        <WeeklySeedBanner draft={seed.draft} onDismiss={() => setSeedDismissed(true)} />
+      )}
 
       {feed && feed.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-line bg-cream/70 px-6 py-16 text-center shadow-soft">

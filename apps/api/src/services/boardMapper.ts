@@ -67,6 +67,7 @@ export function toBoardDetail(b: BoardDetailSource, likedByMe: boolean): BoardDe
       artistName: t.artistName,
       albumImageUrl: t.albumImageUrl,
       previewUrl: t.previewUrl,
+      note: t.note,
       position: t.position,
     })),
   };

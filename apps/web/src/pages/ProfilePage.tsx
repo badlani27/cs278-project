@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { BoardSummary, PublicUser } from "@soundboard/shared";
 import { apiFetch } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
 import { BoardCard } from "../components/BoardCard";
 
 type ProfilePayload = {
@@ -12,8 +13,11 @@ type ProfilePayload = {
 
 export function ProfilePage() {
   const { id } = useParams<{ id: string }>();
+  const { user: sessionUser, updateWeeklySeedOptIn } = useAuth();
   const [data, setData] = useState<ProfilePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [prefsSaving, setPrefsSaving] = useState(false);
+  const isMe = sessionUser?.id === id;
 
   useEffect(() => {
     if (!id) return;
@@ -76,6 +80,31 @@ export function ProfilePage() {
           </p>
         </div>
       </header>
+
+      {isMe && sessionUser && (
+        <section className="rounded-2xl border border-line bg-card/80 p-5 shadow-soft">
+          <h2 className="font-display text-lg text-ink">Preferences</h2>
+          <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={sessionUser.weeklySeedOptIn}
+              disabled={prefsSaving}
+              onChange={(e) => {
+                setPrefsSaving(true);
+                void updateWeeklySeedOptIn(e.target.checked).finally(() => setPrefsSaving(false));
+              }}
+              className="mt-1"
+            />
+            <span>
+              <span className="font-medium">Weekly board seed</span>
+              <span className="mt-1 block text-muted">
+                Once a week, get a private draft suggestion from your Spotify rotation on the feed.
+                Nothing posts automatically.
+              </span>
+            </span>
+          </label>
+        </section>
+      )}
 
       <section className="space-y-4">
         <h2 className="font-display text-2xl text-ink">Original boards</h2>

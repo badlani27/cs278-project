@@ -20,6 +20,16 @@ export const demoUser: PublicUser = {
   imageUrl: null,
 };
 
+let demoWeeklySeedOptIn = false;
+
+export const demoSessionUser = {
+  ...demoUser,
+  spotifyLibraryLinked: true,
+  get weeklySeedOptIn() {
+    return demoWeeklySeedOptIn;
+  },
+};
+
 const users: Record<string, PublicUser> = {
   "demo-aditya": demoUser,
   "demo-akshay": {
@@ -219,6 +229,7 @@ function trackToBoardTrack(t: SpotifySearchTrack, position: number): BoardDetail
     artistName: t.artists,
     albumImageUrl: t.albumImageUrl,
     previewUrl: t.previewUrl,
+    note: null,
     position,
   };
 }
@@ -272,6 +283,7 @@ function createBoardFromPayload(payload: {
     artistName: t.artistName,
     albumImageUrl: t.albumImageUrl ?? null,
     previewUrl: t.previewUrl ?? null,
+    note: t.note?.trim() || null,
     position: i,
   }));
 
@@ -296,8 +308,33 @@ export async function demoFetch<T>(path: string, init?: RequestInit): Promise<T>
   const boards = withCommentCounts(state.boards, state.comments);
   const method = init?.method?.toUpperCase() ?? "GET";
 
-  if (path === "/auth/me") return { user: demoUser } as T;
+  if (path === "/auth/me") {
+    if (method === "PATCH") {
+      const payload = JSON.parse(String(init?.body ?? "{}")) as { weeklySeedOptIn?: boolean };
+      if (typeof payload.weeklySeedOptIn === "boolean") {
+        demoWeeklySeedOptIn = payload.weeklySeedOptIn;
+      }
+      return { user: { ...demoSessionUser, weeklySeedOptIn: demoWeeklySeedOptIn } } as T;
+    }
+    return { user: { ...demoSessionUser, weeklySeedOptIn: demoWeeklySeedOptIn } } as T;
+  }
   if (path === "/auth/logout") return undefined as T;
+
+  if (path === "/stats") {
+    return {
+      activeUsers: 4,
+      totals: {
+        logins: 12,
+        boardCreates: 6,
+        remixes: 2,
+        likes: 18,
+        comments: 9,
+        replies: 3,
+        boardSeedViews: 2,
+      },
+      since: new Date(Date.now() - 30 * 86400000).toISOString(),
+    } as T;
+  }
 
   if (path.startsWith("/spotify/search")) {
     const url = new URL(path, window.location.origin);
@@ -306,6 +343,61 @@ export async function demoFetch<T>(path: string, init?: RequestInit): Promise<T>
       (t) => t.name.toLowerCase().includes(q) || t.artists.toLowerCase().includes(q),
     );
     return { tracks: tracks.length ? tracks : demoTracks.slice(0, 5) } as T;
+  }
+
+  if (path === "/spotify/recent") {
+    return { tracks: demoTracks.slice(0, 8) } as T;
+  }
+
+  if (path === "/spotify/playlists") {
+    return {
+      playlists: [
+        { id: "demo-late-night", name: "late night drives", trackCount: 12, imageUrl: null },
+        { id: "demo-study", name: "study without words", trackCount: 24, imageUrl: null },
+      ],
+    } as T;
+  }
+
+  if (path.startsWith("/spotify/playlists/") && path.endsWith("/tracks")) {
+    return { tracks: demoTracks.slice(2, 10) } as T;
+  }
+
+  if (path.startsWith("/spotify/top-tracks")) {
+    return { tracks: demoTracks.slice(1, 9), range: "short_term" } as T;
+  }
+
+  if (path === "/spotify/board-seed") {
+    if (!demoWeeklySeedOptIn) {
+      return { available: false, reason: "opt_out" } as T;
+    }
+    return {
+      available: true,
+      draft: {
+        tracks: demoTracks.slice(0, 6),
+        suggestedTitle: "This week's rotation",
+        suggestedTags: ["recent", "on repeat"],
+        descriptionHint:
+          "What were you going through when these songs kept showing up? Share the mood, not just the playlist.",
+      },
+    } as T;
+  }
+
+  const overlapMatch = path.match(/^\/boards\/([^/]+)\/overlap$/);
+  if (overlapMatch && method === "GET") {
+    const board = boards.find((b) => b.id === overlapMatch[1]);
+    const sharedTracks = board
+      ? demoTracks.filter((t) => board.tracks.some((bt) => bt.spotifyTrackId === t.id)).slice(0, 2)
+      : [];
+    const sharedTags = board?.tags.filter((t) => t === "cozy" || t === "aesthetic") ?? [];
+    return { sharedTracks, sharedTags } as T;
+  }
+
+  const remixSuggestionsMatch = path.match(/^\/boards\/([^/]+)\/remix-suggestions$/);
+  if (remixSuggestionsMatch && method === "GET") {
+    const board = boards.find((b) => b.id === remixSuggestionsMatch[1]);
+    const onBoard = new Set(board?.tracks.map((t) => t.spotifyTrackId));
+    const suggestions = demoTracks.filter((t) => !onBoard.has(t.id)).slice(0, 4);
+    return { suggestions } as T;
   }
 
   if (path === "/boards" && method === "GET") {

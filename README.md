@@ -34,7 +34,7 @@ local browser storage, so graders can click through the prototype without Spotif
 npm run dev -w @soundboard/web
 ```
 
-Open [http://localhost:5173](http://localhost:5173). To force real API-only behavior, set
+Open [http://127.0.0.1:5173](http://127.0.0.1:5173). To force real API-only behavior, set
 `VITE_DEMO_MODE=false`.
 
 ### 2. Environment
@@ -48,28 +48,66 @@ cp .env.example .env
 | Variable | Purpose |
 |----------|---------|
 | `DATABASE_URL` | PostgreSQL connection string |
-| `CLIENT_URL` | Vite app origin (default `http://localhost:5173`) — used for CORS + OAuth redirect |
-| `API_URL` | API public base URL (`http://localhost:4000`) |
+| `CLIENT_URL` | Vite app origin (default `http://127.0.0.1:5173`) — used for CORS + OAuth redirect |
+| `API_URL` | API public base URL (`http://127.0.0.1:4000`) |
 | `VITE_API_URL` | Same origin the browser uses to call the API (must match `API_URL` in local dev) |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | From Spotify Dashboard |
-| `SPOTIFY_REDIRECT_URI` | **Must be** `http://localhost:4000/auth/spotify/callback` for local dev |
+| `SPOTIFY_REDIRECT_URI` | **Must be** `http://127.0.0.1:4000/auth/spotify/callback` for local dev |
 | `SESSION_SECRET` | Long random string for signing cookies |
 
 **Spotify Dashboard settings**
 
-- Redirect URI: `http://localhost:4000/auth/spotify/callback`
-- The API uses the **Client Credentials** grant for track search (no extra scopes) and **Authorization Code** for login.
+- Redirect URI: `http://127.0.0.1:4000/auth/spotify/callback`
+- Login requests scopes for profile, recently played tracks, top tracks, and private playlists. If you logged in before a scope was added, **log out and sign in again** so Spotify grants the new permissions.
+- Track search uses the **Client Credentials** grant (no user scopes). Personal library endpoints use the stored refresh token from login.
 
 If Spotify env vars are omitted, the API still boots; login and search return friendly errors until you add credentials.
 
 ### 3. Database
 
-Create a database (example name `soundboard`), then:
+Soundboard needs **PostgreSQL** running before Spotify login can finish (your user is saved to the DB after OAuth).
+
+**Option A — Docker** (matches `.env` defaults `postgres` / `postgres`):
 
 ```bash
-npm run db:generate
+docker compose up -d
 npm run db:migrate
-# optional sample row for empty UI testing
+```
+
+**Option B — Homebrew** (macOS):
+
+```bash
+brew install postgresql@16
+brew services start postgresql@16
+createdb soundboard
+npm run db:migrate
+```
+
+If Homebrew Postgres uses your Mac username instead of `postgres`, update `DATABASE_URL` in `.env`:
+
+```env
+DATABASE_URL="postgresql://YOUR_MAC_USERNAME@localhost:5432/soundboard?schema=public"
+```
+
+**Option C — [Postgres.app](https://postgresapp.com/)** — install, start the app, create a `soundboard` database, then `npm run db:migrate`.
+
+**Option D — Supabase (hosted Postgres)**
+
+1. Create a project at [supabase.com](https://supabase.com) and note the project ref (in the dashboard URL).
+2. Open **Connect** → copy the **Session pooler** URI (port `5432`). Set it as `DATABASE_URL` in the repo root `.env`.
+3. Do **not** use the direct `db.<ref>.supabase.co` URL on most networks — it is IPv6-only and Prisma will report `Can't reach database server`.
+4. Run `npm run db:push` (or `npm run db:migrate`), then `npm run db:check` to verify.
+
+Verify the database is reachable:
+
+```bash
+curl http://127.0.0.1:4000/health
+# should include "database": true
+```
+
+Optional seed data:
+
+```bash
 npm run db:seed
 ```
 
@@ -83,8 +121,8 @@ From the repo root:
 npm run dev
 ```
 
-- Web: [http://localhost:5173](http://localhost:5173)
-- API: [http://localhost:4000](http://localhost:4000) (`GET /health`)
+- Web: [http://127.0.0.1:5173](http://127.0.0.1:5173)
+- API: [http://127.0.0.1:4000](http://127.0.0.1:4000) (`GET /health`)
 
 The `dev` script builds `@soundboard/shared` and `@soundboard/db` once so workspace imports resolve; after changing Prisma schema, run `npm run db:generate` (or `npm run build -w @soundboard/db`).
 
@@ -129,6 +167,15 @@ The home feed also returns a small **`discover`** array: recent boards from **di
 | GET/POST | `/boards/:id/comments` | List / create comments |
 | POST | `/comments/:id/replies` | One-level reply (auth) |
 | GET | `/spotify/search?q=` | Track search (Client Credentials) |
+| GET | `/spotify/recent` | Recently played tracks (auth, Spotify linked) |
+| GET | `/spotify/top-tracks?range=` | Top tracks: `short_term`, `medium_term`, `long_term` |
+| GET | `/spotify/playlists` | User's Spotify playlists (auth) |
+| GET | `/spotify/playlists/:id/tracks` | Playlist tracks for import (auth, paginated up to 80) |
+| GET | `/spotify/board-seed` | Opt-in weekly draft suggestion (auth) |
+| GET | `/boards/:id/overlap` | Taste overlap with viewer (auth) |
+| GET | `/boards/:id/remix-suggestions` | Remix track suggestions from viewer's rotation (auth) |
+| PATCH | `/auth/me` | Update preferences (`weeklySeedOptIn`) |
+| GET | `/stats` | Aggregated usage counts (last 30 days) |
 | GET | `/users/:id` | Profile + boards + remixes |
 
 ## Product notes
@@ -147,6 +194,10 @@ The home feed also returns a small **`discover`** array: recent boards from **di
 | `npm run db:migrate` | `prisma migrate dev` |
 | `npm run db:push` | `prisma db push` (prototyping) |
 | `npm run db:seed` | Optional seed board |
+
+## Deployment
+
+Step-by-step production deploy (Vercel + Render + Supabase, demo mode for public access): **[DEPLOYMENT.md](./DEPLOYMENT.md)**.
 
 ## License
 

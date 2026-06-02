@@ -1,7 +1,39 @@
 import { demoFetch } from "./demoData";
 
-export const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
+export const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:4000";
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE !== "false";
+
+/** Spotify OAuth must hit the API directly so the session cookie matches the callback URL. */
+export function spotifyLoginUrl(): string {
+  return `${API_BASE}/auth/spotify/login`;
+}
+
+export async function checkApiHealth(): Promise<{
+  ok: boolean;
+  spotifyConfigured: boolean;
+  database: boolean;
+}> {
+  try {
+    const res = await fetch(`${API_BASE}/health`, { credentials: "include" });
+    if (!res.ok) return { ok: false, spotifyConfigured: false, database: false };
+    const data = (await res.json()) as {
+      ok?: boolean;
+      spotifyConfigured?: boolean;
+      database?: boolean;
+    };
+    return {
+      ok: Boolean(data.ok),
+      spotifyConfigured: Boolean(data.spotifyConfigured),
+      database: Boolean(data.database),
+    };
+  } catch {
+    return { ok: false, spotifyConfigured: false, database: false };
+  }
+}
+
+export function isDemoMode(): boolean {
+  return DEMO_MODE;
+}
 
 export async function apiFetch<T>(
   path: string,

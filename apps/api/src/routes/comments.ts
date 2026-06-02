@@ -2,7 +2,9 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "@soundboard/db";
 import { requireAuth } from "../middleware/requireAuth";
+import { asyncHandler } from "../middleware/asyncHandler";
 import type { CommentNode, PublicUser } from "@soundboard/shared";
+import { logUsageEvent, UsageEventType } from "../services/usageLog";
 
 type IdParams = { id: string };
 
@@ -17,45 +19,54 @@ function toPublicUser(u: { id: string; displayName: string; imageUrl: string | n
 export function createBoardCommentsRouter() {
   const r = Router({ mergeParams: true });
 
-  r.get("/", async (req, res) => {
-    const boardId = (req.params as IdParams).id;
-    const exists = await prisma.board.findUnique({ where: { id: boardId }, select: { id: true } });
-    if (!exists) {
-      res.status(404).json({ error: "Board not found" });
-      return;
-    }
-    const comments = await fetchCommentTree(boardId);
-    res.json({ comments });
-  });
+  r.get(
+    "/",
+    asyncHandler(async (req, res) => {
+      const boardId = (req.params as IdParams).id;
+      const exists = await prisma.board.findUnique({ where: { id: boardId }, select: { id: true } });
+      if (!exists) {
+        res.status(404).json({ error: "Board not found" });
+        return;
+      }
+      const comments = await fetchCommentTree(boardId);
+      res.json({ comments });
+    }),
+  );
 
-  r.post("/", requireAuth, async (req, res) => {
-    const boardId = (req.params as IdParams).id;
-    const parsed = bodySchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "Invalid body" });
-      return;
-    }
-    const board = await prisma.board.findUnique({ where: { id: boardId } });
-    if (!board) {
-      res.status(404).json({ error: "Board not found" });
-      return;
-    }
-    const comment = await prisma.comment.create({
-      data: {
-        boardId,
-        userId: req.session.userId!,
-        body: parsed.data.body.trim(),
-      },
-      include: { user: { select: { id: true, displayName: true, imageUrl: true } } },
-    });
-    res.status(201).json({
-      id: comment.id,
-      body: comment.body,
-      createdAt: comment.createdAt.toISOString(),
-      user: toPublicUser(comment.user),
-      replies: [],
-    });
-  });
+  r.post(
+    "/",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const boardId = (req.params as IdParams).id;
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid body" });
+        return;
+      }
+      const board = await prisma.board.findUnique({ where: { id: boardId } });
+      if (!board) {
+        res.status(404).json({ error: "Board not found" });
+        return;
+      }
+      const userId = req.session.userId!;
+      const comment = await prisma.comment.create({
+        data: {
+          boardId,
+          userId,
+          body: parsed.data.body.trim(),
+        },
+        include: { user: { select: { id: true, displayName: true, imageUrl: true } } },
+      });
+      await logUsageEvent(UsageEventType.COMMENT, userId, boardId);
+      res.status(201).json({
+        id: comment.id,
+        body: comment.body,
+        createdAt: comment.createdAt.toISOString(),
+        user: toPublicUser(comment.user),
+        replies: [],
+      });
+    }),
+  );
 
   return r;
 }
@@ -63,40 +74,46 @@ export function createBoardCommentsRouter() {
 export function createCommentRepliesRouter() {
   const r = Router({ mergeParams: true });
 
-  r.post("/", requireAuth, async (req, res) => {
-    const parentId = (req.params as IdParams).id;
-    const parsed = bodySchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "Invalid body" });
-      return;
-    }
-    const parent = await prisma.comment.findUnique({
-      where: { id: parentId },
-    });
-    if (!parent) {
-      res.status(404).json({ error: "Comment not found" });
-      return;
-    }
-    if (parent.parentCommentId) {
-      res.status(400).json({ error: "Only one level of replies is supported" });
-      return;
-    }
-    const comment = await prisma.comment.create({
-      data: {
-        boardId: parent.boardId,
-        userId: req.session.userId!,
-        parentCommentId: parentId,
-        body: parsed.data.body.trim(),
-      },
-      include: { user: { select: { id: true, displayName: true, imageUrl: true } } },
-    });
-    res.status(201).json({
-      id: comment.id,
-      body: comment.body,
-      createdAt: comment.createdAt.toISOString(),
-      user: toPublicUser(comment.user),
-    });
-  });
+  r.post(
+    "/",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const parentId = (req.params as IdParams).id;
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid body" });
+        return;
+      }
+      const parent = await prisma.comment.findUnique({
+        where: { id: parentId },
+      });
+      if (!parent) {
+        res.status(404).json({ error: "Comment not found" });
+        return;
+      }
+      if (parent.parentCommentId) {
+        res.status(400).json({ error: "Only one level of replies is supported" });
+        return;
+      }
+      const userId = req.session.userId!;
+      const comment = await prisma.comment.create({
+        data: {
+          boardId: parent.boardId,
+          userId,
+          parentCommentId: parentId,
+          body: parsed.data.body.trim(),
+        },
+        include: { user: { select: { id: true, displayName: true, imageUrl: true } } },
+      });
+      await logUsageEvent(UsageEventType.REPLY, userId, parent.boardId);
+      res.status(201).json({
+        id: comment.id,
+        body: comment.body,
+        createdAt: comment.createdAt.toISOString(),
+        user: toPublicUser(comment.user),
+      });
+    }),
+  );
 
   return r;
 }

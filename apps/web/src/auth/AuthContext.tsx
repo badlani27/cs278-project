@@ -7,22 +7,21 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { PublicUser } from "@soundboard/shared";
+import type { MeResponse, SessionUser } from "@soundboard/shared";
 import { apiFetch } from "../api/client";
 
-type MeResponse = { user: PublicUser | null };
-
 type AuthContextValue = {
-  user: PublicUser | null;
+  user: SessionUser | null;
   loading: boolean;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
+  updateWeeklySeedOptIn: (enabled: boolean) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<PublicUser | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -45,9 +44,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const updateWeeklySeedOptIn = useCallback(async (enabled: boolean) => {
+    const data = await apiFetch<MeResponse>("/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify({ weeklySeedOptIn: enabled }),
+    });
+    setUser(data.user);
+  }, []);
+
   const value = useMemo(
-    () => ({ user, loading, refresh, logout }),
-    [user, loading, refresh, logout],
+    () => ({ user, loading, refresh, logout, updateWeeklySeedOptIn }),
+    [user, loading, refresh, logout, updateWeeklySeedOptIn],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
