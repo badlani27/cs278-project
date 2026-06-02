@@ -28,15 +28,31 @@ const app = express();
 
 app.set("trust proxy", 1);
 
+function isAllowedCorsOrigin(origin: string | undefined, clientUrl: string): boolean {
+  if (!origin) return true;
+  const allowed = new Set([
+    clientUrl,
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+  ]);
+  if (allowed.has(origin)) return true;
+  try {
+    const clientHost = new URL(clientUrl).hostname;
+    const originHost = new URL(origin).hostname;
+    // Vercel production + preview deployment URLs (e.g. *-team.vercel.app)
+    if (clientHost.endsWith(".vercel.app") && originHost.endsWith(".vercel.app")) {
+      return true;
+    }
+  } catch {
+    /* ignore malformed URLs */
+  }
+  return false;
+}
+
 app.use(
   cors({
     origin(origin, callback) {
-      const allowed = new Set([
-        env.CLIENT_URL,
-        "http://127.0.0.1:5173",
-        "http://localhost:5173",
-      ]);
-      if (!origin || allowed.has(origin)) {
+      if (isAllowedCorsOrigin(origin, env.CLIENT_URL)) {
         callback(null, true);
         return;
       }

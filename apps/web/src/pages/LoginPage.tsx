@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { checkApiHealth, isDemoMode, spotifyLoginUrl } from "../api/client";
+import { API_BASE, checkApiHealth, isDemoMode, spotifyLoginUrl } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 
 export function LoginPage() {
@@ -15,6 +15,8 @@ export function LoginPage() {
   } | null>(null);
   const loginUrl = spotifyLoginUrl();
   const demoMode = isDemoMode();
+  const isLocalDev =
+    API_BASE.includes("127.0.0.1") || API_BASE.includes("localhost");
 
   useEffect(() => {
     let cancelled = false;
@@ -52,18 +54,57 @@ export function LoginPage() {
             role="status"
           >
             <p className="font-medium">API not reachable</p>
-            <p className="mt-1 text-muted">
-              The backend on port 4000 isn&apos;t running. Stop old terminals (Ctrl+C), then from
-              the project root run:
-            </p>
-            <code className="mt-2 block rounded-lg bg-card px-2 py-1 text-xs">npm run dev</code>
-            <p className="mt-2 text-xs text-muted">
-              Then open{" "}
-              <a href="http://127.0.0.1:5173" className="font-medium text-ink underline">
-                http://127.0.0.1:5173
-              </a>{" "}
-              — not <code className="text-ink">localhost:5173</code> or port 5174.
-            </p>
+            {isLocalDev ? (
+              <>
+                <p className="mt-1 text-muted">
+                  The backend on port 4000 isn&apos;t running. Stop old terminals (Ctrl+C), then
+                  from the project root run:
+                </p>
+                <code className="mt-2 block rounded-lg bg-card px-2 py-1 text-xs">npm run dev</code>
+                <p className="mt-2 text-xs text-muted">
+                  Then open{" "}
+                  <a href="http://127.0.0.1:5173" className="font-medium text-ink underline">
+                    http://127.0.0.1:5173
+                  </a>{" "}
+                  — not <code className="text-ink">localhost:5173</code> or port 5174.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-1 text-muted">
+                  The browser couldn&apos;t reach the API at{" "}
+                  <code className="text-ink">{API_BASE}</code>.
+                </p>
+                <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-muted">
+                  <li>
+                    Free Render may be waking up — open{" "}
+                    <a
+                      href={`${API_BASE}/health`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-ink underline"
+                    >
+                      {API_BASE}/health
+                    </a>{" "}
+                    in a new tab, wait for JSON, then refresh.
+                  </li>
+                  <li>
+                    Use the production URL{" "}
+                    <strong>https://soundboard-orpin-one.vercel.app</strong> (not a preview
+                    deployment link).
+                  </li>
+                  <li>
+                    On Render, <code className="text-ink">CLIENT_URL</code> must match this site
+                    exactly.
+                  </li>
+                </ul>
+                {demoMode && (
+                  <p className="mt-2 text-xs text-muted">
+                    You can still use <strong>Continue in demo mode</strong> below.
+                  </p>
+                )}
+              </>
+            )}
           </div>
         )}
 
