@@ -1,9 +1,17 @@
 import { demoFetch } from "./demoData";
 
-export const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:4000";
+/** Production on Vercel uses /api proxy (see vercel.json) so session cookies stay first-party. */
+function resolveApiBase(): string {
+  const fromEnv = import.meta.env.VITE_API_URL?.trim();
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  if (import.meta.env.PROD) return "/api";
+  return "http://127.0.0.1:4000";
+}
+
+export const API_BASE = resolveApiBase();
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE !== "false";
 
-/** Spotify OAuth must hit the API directly so the session cookie matches the callback URL. */
+/** Spotify OAuth goes through the same origin as the web app in production (/api proxy). */
 export function spotifyLoginUrl(): string {
   return `${API_BASE}/auth/spotify/login`;
 }

@@ -16,6 +16,14 @@ const env = loadEnv();
 
 function sessionSameSite(): "lax" | "none" {
   try {
+    // OAuth callback on CLIENT_URL (via Vercel /api proxy) → first-party cookies, SameSite=Lax
+    if (
+      env.SPOTIFY_REDIRECT_URI &&
+      env.CLIENT_URL &&
+      env.SPOTIFY_REDIRECT_URI.startsWith(env.CLIENT_URL)
+    ) {
+      return "lax";
+    }
     const clientHost = new URL(env.CLIENT_URL).hostname;
     const apiHost = new URL(env.API_URL).hostname;
     return clientHost === apiHost ? "lax" : "none";
