@@ -14,13 +14,18 @@ function findEnvFile(): string | undefined {
 }
 
 export function loadDatabaseEnv(): void {
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
   const envFile = findEnvFile();
   if (envFile) {
     config({ path: envFile, override: true });
   }
 }
 
-loadDatabaseEnv();
+if (process.env.NODE_ENV !== "production") {
+  loadDatabaseEnv();
+}
 
 type PrismaGlobal = {
   prisma?: PrismaClient;

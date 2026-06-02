@@ -75,7 +75,7 @@ postgresql://postgres.PROJECT_REF:PASSWORD@aws-1-REGION.pooler.supabase.com:5432
    | **Branch** | `main` |
    | **Root Directory** | *(leave empty — repo root)* |
    | **Runtime** | Node |
-   | **Build Command** | `npm install && npm run build -w @soundboard/db && npm run build -w @soundboard/shared && npm run build -w @soundboard/api` |
+   | **Build Command** | `npm install --include=dev && npm run build -w @soundboard/db && npm run build -w @soundboard/shared && npm run build -w @soundboard/api` |
    | **Start Command** | `node apps/api/dist/index.js` |
    | **Instance type** | Free (or paid for always-on) |
 
