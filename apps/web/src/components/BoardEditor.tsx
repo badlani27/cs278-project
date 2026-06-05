@@ -442,7 +442,7 @@ export function BoardEditor({
               ["search", "Search"],
               ["recent", "Your week"],
               ["top", "Top tracks"],
-              ["playlists", "Playlists"],
+              ["playlists", "Playlists (coming soon)"],
             ] as const
           ).map(([tab, label]) => (
             <button
